@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -142,6 +143,29 @@ func createMethodDirective(itemMap map[any]any) string {
 	if urlAny != nil {
 		url = urlAny.(string)
 	}
+	
+	// Add query parameters if they exist
+	if itemMap["parameters"] != nil {
+		params := itemMap["parameters"].([]any)
+		var queryParams []string
+		for _, param := range params {
+			if paramMap, ok := param.(map[any]any); ok {
+				if key, ok := paramMap["name"].(string); ok {
+					if value, ok := paramMap["value"].(string); ok {
+						queryParams = append(queryParams, fmt.Sprintf("%s=%s", key, value))
+					}
+				}
+			}
+		}
+		if len(queryParams) > 0 {
+			separator := "?"
+			if strings.Contains(url, "?") {
+				separator = "&"
+			}
+			url += separator + strings.Join(queryParams, "&")
+		}
+	}
+	
 	body := itemMap["body"]
 	bodyType, _ := detectBodyType(body)
 	return method + ` {
@@ -199,6 +223,8 @@ func detectBodyType(body any) (string, string) {
 		return "multipartForm", "body:multipart-form"
 	} else if strings.HasSuffix(mineType, "application/x-www-form-urlencoded") {
 		return "formUrlEncoded", "body:form-urlencoded"
+	} else if strings.HasSuffix(mineType, "text/plain") {
+		return "text", "body:text"
 	} else {
 		return "none", "body:none"
 	}
@@ -206,15 +232,48 @@ func detectBodyType(body any) (string, string) {
 
 func createBodyDirective(itemMap map[any]any) string {
 	body := itemMap["body"]
-	if body == nil || body.(map[any]any)["text"] == nil {
+	if body == nil {
 		return ""
 	}
+	
+	bodyMap := body.(map[any]any)
 	_, bodyDirectiveType := detectBodyType(body)
-	bodyText := body.(map[any]any)["text"].(string)
 
-	return bodyDirectiveType + ` {
+	if bodyDirectiveType == "body:json" && bodyMap["text"] != nil {
+		bodyText := bodyMap["text"].(string)
+		return bodyDirectiveType + ` {
   ` + regexp.MustCompile(`\n`).ReplaceAllString(bodyText, "\n  ") + `
 }`
+	}
+
+	if bodyDirectiveType == "body:text" && bodyMap["text"] != nil {
+		bodyText := bodyMap["text"].(string)
+		return bodyDirectiveType + ` {
+  ` + regexp.MustCompile(`\n`).ReplaceAllString(bodyText, "\n  ") + `
+}`
+	}
+
+	if (bodyDirectiveType == "body:multipart-form" || bodyDirectiveType == "body:form-urlencoded") && bodyMap["params"] != nil {
+		bodyParamsFrom := bodyMap["params"].([]any)
+		var bodyParams []string
+		for _, param := range bodyParamsFrom {
+			if paramMap, ok := param.(map[any]any); ok {
+				if key, ok := paramMap["name"].(string); ok {
+					if value, ok := paramMap["type"].(string); ok && value == "file" {
+						bodyParams = append(bodyParams, fmt.Sprintf("  %s: @file()", key))
+					} else if value, ok := paramMap["value"].(string); ok {
+						bodyParams = append(bodyParams, fmt.Sprintf("  %s: %s", key, value))
+					} else {
+						// nothing to do, just skip
+					}
+				}
+			}
+		}
+		return bodyDirectiveType + ` {
+  ` + strings.Join(bodyParams, "\n  ") + `
+}`
+	}
+	return ""
 }
 
 func createEnvironmentFile(optionOutputDir string, data map[any]any) {
@@ -241,6 +300,7 @@ func createEnvironmentFile(optionOutputDir string, data map[any]any) {
 		for key, value := range environmentValuesMap {
 			envVars = append(envVars, "  "+key.(string)+": "+value.(string))
 		}
+		sort.Strings(envVars)
 		envContent := strings.Join(envVars, "\n")
 		createAndWriteFile(fmt.Sprintf("%s/environments/%s.bru", optionOutputDir, environmentName), `vars {
 `+envContent+`
