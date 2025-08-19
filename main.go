@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"regexp"
 	"sort"
@@ -62,26 +61,13 @@ func main() {
 	})
 	fmt.Printf("\n\n")
 
-	// Create output directory if it doesn't exist
-	if _, err := os.Stat(*optionOutputDir); os.IsNotExist(err) {
-		err := os.MkdirAll(*optionOutputDir, 0755)
-		handleError(err, "os.MkdirAll(*optionOutputDir, 0755)")
-		fmt.Printf("Created output directory: %s\n", *optionOutputDir)
-	} else if err != nil {
-		handleError(err, "os.Stat(*optionOutputDir)")
-	}
-
 	var data map[any]any
 	err := yaml.Unmarshal([]byte(ReadAllFileContents(optionInsomniaYamlFilePath)), &data)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(data)
+	handleError(err, "yaml.Unmarshal([]byte(ReadAllFileContents(*optionInsomniaYamlFilePath))")
 
+	createDirectory(*optionOutputDir)
 	createBrunoJsonFile(*optionOutputDir, *optionBrunoCollectionName)
-
 	createEnvironmentFile(*optionOutputDir, data)
-
 	createCollectionFile(*optionOutputDir, data["collection"].([]any))
 
 }
@@ -143,7 +129,7 @@ func createMethodDirective(itemMap map[any]any) string {
 	if urlAny != nil {
 		url = urlAny.(string)
 	}
-	
+
 	// Add query parameters if they exist
 	if itemMap["parameters"] != nil {
 		params := itemMap["parameters"].([]any)
@@ -165,7 +151,7 @@ func createMethodDirective(itemMap map[any]any) string {
 			url += separator + strings.Join(queryParams, "&")
 		}
 	}
-	
+
 	body := itemMap["body"]
 	bodyType, _ := detectBodyType(body)
 	return method + ` {
@@ -235,7 +221,7 @@ func createBodyDirective(itemMap map[any]any) string {
 	if body == nil {
 		return ""
 	}
-	
+
 	bodyMap := body.(map[any]any)
 	_, bodyDirectiveType := detectBodyType(body)
 
@@ -335,6 +321,16 @@ func createAndWriteFile(filePath string, content string) {
 // =======================================
 // File Utils
 // =======================================
+
+func createDirectory(dir string) {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.MkdirAll(dir, 0755)
+		handleError(err, "os.MkdirAll(dir, 0755)")
+		fmt.Printf("Created directory: %s\n", dir)
+	} else if err != nil {
+		handleError(err, "os.Stat(dir)")
+	}
+}
 
 func ReadAllFileContents(filePath *string) string {
 	file, err := os.Open(*filePath)
