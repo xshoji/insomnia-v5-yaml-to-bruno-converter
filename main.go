@@ -85,6 +85,10 @@ func main() {
 
 }
 
+// =======================================
+// Insomnia to Bruno Converter functions
+// =======================================
+
 func createCollectionFile(optionOutputDir string, collectionList []any) {
 	for _, item := range collectionList {
 		itemMap := item.(map[any]any)
@@ -107,12 +111,31 @@ func createCollectionFile(optionOutputDir string, collectionList []any) {
 
 func createRequestFile(optionOutputDir string, itemMap map[any]any, itemName, itemId string) {
 	fileName := strings.ReplaceAll(itemName, "/", "_") + "_" + itemId + ".bru"
-	metaData := `meta {
+	metaDirective := createMetaDirective(itemName)
+	methodDirective := createMethodDirective(itemMap)
+	headerDirective := createHeadersDirective(itemMap)
+	bodyDirective := createBodyDirective(itemMap)
+	settingsDirective := `settings {
+  encodeUrl: true
+}`
+	createAndWriteFile(fmt.Sprintf("%s/%s", optionOutputDir, fileName), strings.Join([]string{
+		metaDirective,
+		methodDirective,
+		headerDirective,
+		bodyDirective,
+		settingsDirective,
+	}, "\n\n"))
+}
+
+func createMetaDirective(itemName string) string {
+	return `meta {
   name: ` + itemName + `
   type: http
   seq: 1
 }`
+}
 
+func createMethodDirective(itemMap map[any]any) string {
 	method := strings.ToLower(itemMap["method"].(string))
 	urlAny := itemMap["url"]
 	url := ""
@@ -120,35 +143,27 @@ func createRequestFile(optionOutputDir string, itemMap map[any]any, itemName, it
 		url = urlAny.(string)
 	}
 	body := itemMap["body"]
-	bodyType := detectBodyType(body)
-	methodData := method + ` {
+	bodyType, _ := detectBodyType(body)
+	return method + ` {
   url: ` + url + `
   body: ` + bodyType + `
   auth: inherit
 }`
+}
 
+func createHeadersDirective(itemMap map[any]any) string {
 	headers := parseHeaders(itemMap)
-	headerData := ""
 	if len(headers) > 0 {
 		var headerVars []string
 		for key, value := range headers {
 			headerVars = append(headerVars, "  "+key+": "+value)
 		}
 		headerContent := strings.Join(headerVars, "\n")
-		headerData = `headers {
-` + headerContent + `
+		return `headers {
+  ` + headerContent + `
 }`
 	}
-
-	settingsData := `settings {
-  encodeUrl: true
-}`
-	createAndWriteFile(fmt.Sprintf("%s/%s", optionOutputDir, fileName), strings.Join([]string{
-		metaData,
-		methodData,
-		headerData,
-		settingsData,
-	}, "\n\n"))
+	return ""
 }
 
 func parseHeaders(itemMap map[any]any) map[string]string {
@@ -172,21 +187,34 @@ func parseHeaders(itemMap map[any]any) map[string]string {
 	return result
 }
 
-func detectBodyType(body any) string {
+func detectBodyType(body any) (string, string) {
 	mineType := ""
 	if body != nil && body.(map[any]any)["mimeType"] != nil {
 		mineType = body.(map[any]any)["mimeType"].(string)
 	}
 
 	if strings.HasSuffix(mineType, "application/json") {
-		return "json"
+		return "json", "body:json"
 	} else if strings.HasSuffix(mineType, "multipart/form-data") {
-		return "multipartForm"
+		return "multipartForm", "body:multipart-form"
 	} else if strings.HasSuffix(mineType, "application/x-www-form-urlencoded") {
-		return "formUrlEncoded"
+		return "formUrlEncoded", "body:form-urlencoded"
 	} else {
-		return "none"
+		return "none", "body:none"
 	}
+}
+
+func createBodyDirective(itemMap map[any]any) string {
+	body := itemMap["body"]
+	if body == nil || body.(map[any]any)["text"] == nil {
+		return ""
+	}
+	_, bodyDirectiveType := detectBodyType(body)
+	bodyText := body.(map[any]any)["text"].(string)
+
+	return bodyDirectiveType + ` {
+  ` + regexp.MustCompile(`\n`).ReplaceAllString(bodyText, "\n  ") + `
+}`
 }
 
 func createEnvironmentFile(optionOutputDir string, data map[any]any) {
