@@ -25,9 +25,9 @@ var (
 	// Command options ( the -h, --help option is defined by default in the flag package )
 	commandDescription         = "This tool converts Insomnia-exported files (v5 YAML) into a Bruno collection files."
 	commandOptionFieldWidth    = "12" // recommended width = general: 12, bool only: 5
-	optionInsomniaYamlFilePath = flag.String("f" /*  */, "" /*                         */, UsageRequiredPrefix+"Path to Insomnia exported file")
-	optionOutputDir            = flag.String("o" /*  */, "" /*                         */, UsageRequiredPrefix+"Output directory")
-	optionBrunoCollectionName  = flag.String("n" /*  */, "" /*                         */, UsageRequiredPrefix+"Name of bruno collection")
+	optionInsomniaYamlFilePath = flag.String("f", "", UsageRequiredPrefix+"Path to Insomnia exported file")
+	optionOutputDir            = flag.String("o", "", UsageRequiredPrefix+"Output directory")
+	optionBrunoCollectionName  = flag.String("n", "", UsageRequiredPrefix+"Name of bruno collection")
 )
 
 func init() {
