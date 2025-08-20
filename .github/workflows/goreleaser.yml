@@ -29,4 +29,4 @@ jobs:
         env:
           # environment-variables - GitHub Actions - GoReleaser https://goreleaser.com/ci/actions/#environment-variables
           # i-3 - GitHub Actionsの使い方 | 純規の暇人趣味ブログ https://jyn.jp/github-actions-usage/#i-3
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
