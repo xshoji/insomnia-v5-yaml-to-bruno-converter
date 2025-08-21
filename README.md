@@ -2,6 +2,14 @@
 
 insomnia-v5-yaml-to-bruno-converter
 
+## Features
+
+Compared to Bruno's built-in Insomnia YAML import functionality, this tool provides enhanced capabilities:
+- **Request order preservation**: Maintains the original order of requests and folders from your Insomnia collection
+- **Environment migration support**: Fully converts and migrates Insomnia environments to Bruno environment files
+
+
+
 # Usage
 
 ```

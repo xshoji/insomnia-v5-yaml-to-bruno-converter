@@ -43,8 +43,6 @@ func init() {
 	}
 }
 
-// Build:
-// $ GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o /tmp/tool main.go
 func main() {
 
 	flag.Parse()
@@ -101,6 +99,7 @@ func createRequestFile(optionOutputDir string, itemMap map[any]any, itemName, it
 	metaDirective := createMetaDirective(itemName)
 	methodDirective := createMethodDirective(itemMap)
 	headerDirective := createHeadersDirective(itemMap)
+	paramsQueryDirective := createParamsQueryDirective(itemMap)
 	bodyDirective := createBodyDirective(itemMap)
 	settingsDirective := `settings {
   encodeUrl: true
@@ -109,9 +108,19 @@ func createRequestFile(optionOutputDir string, itemMap map[any]any, itemName, it
 		metaDirective,
 		methodDirective,
 		headerDirective,
+		paramsQueryDirective,
 		bodyDirective,
 		settingsDirective,
 	}, "\n\n"))
+}
+
+func createParamsQueryDirective(itemMap map[any]any) string {
+	if itemMap["parameters"] == nil {
+		return ""
+	}
+	return `params:query {
+  ` + strings.Join(parseQueryParams(itemMap, ": "), "\n  ") + `
+}`
 }
 
 func createMetaDirective(itemName string) string {
@@ -132,23 +141,13 @@ func createMethodDirective(itemMap map[any]any) string {
 
 	// Add query parameters if they exist
 	if itemMap["parameters"] != nil {
-		params := itemMap["parameters"].([]any)
-		var queryParams []string
-		for _, param := range params {
-			if paramMap, ok := param.(map[any]any); ok {
-				if key, ok := paramMap["name"].(string); ok {
-					if value, ok := paramMap["value"].(string); ok {
-						queryParams = append(queryParams, fmt.Sprintf("%s=%s", key, value))
-					}
-				}
-			}
-		}
-		if len(queryParams) > 0 {
+		paramsQuery := parseQueryParams(itemMap, "=")
+		if len(paramsQuery) > 0 {
 			separator := "?"
 			if strings.Contains(url, "?") {
 				separator = "&"
 			}
-			url += separator + strings.Join(queryParams, "&")
+			url += separator + strings.Join(paramsQuery, "&")
 		}
 	}
 
@@ -174,6 +173,24 @@ func createHeadersDirective(itemMap map[any]any) string {
 }`
 	}
 	return ""
+}
+
+func parseQueryParams(itemMap map[any]any, jointString string) []string {
+	if itemMap["parameters"] == nil {
+		return nil
+	}
+	params := itemMap["parameters"].([]any)
+	var queryParams []string
+	for _, param := range params {
+		if paramMap, ok := param.(map[any]any); ok {
+			if key, ok := paramMap["name"].(string); ok {
+				if value, ok := paramMap["value"].(string); ok {
+					queryParams = append(queryParams, fmt.Sprintf("%s%s%s", key, jointString, value))
+				}
+			}
+		}
+	}
+	return queryParams
 }
 
 func parseHeaders(itemMap map[any]any) map[string]string {
